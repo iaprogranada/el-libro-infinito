@@ -2,6 +2,7 @@ import "server-only";
 import { createHash } from "node:crypto";
 import { db } from "./supabase";
 import { rewriteSummary, type SummarySections } from "./ai";
+import { SUMMARY_RATE_STEPS, shouldRefreshSummary, summaryBatchSize } from "./summary-policy";
 
 export interface Paragraph {
   n: number;
@@ -143,39 +144,73 @@ export async function rateAllowed(bucket: string, ip: string, max: number, windo
 
 /* ------------------------------ Resumen ------------------------------ */
 
-const SUMMARY_MAX_NEW = 60;
+// Tope de párrafos nuevos por reescritura (el lote más grande es 100; el resto es margen).
+const SUMMARY_MAX_NEW = 150;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-// Reescribe el resumen si hay párrafos nuevos. Evita trabajos duplicados y agrupa ráfagas:
-// si se actualizó hace menos de 20 s y hay menos de 5 párrafos nuevos, espera al siguiente.
-export async function refreshSummaryIfNeeded(opts: { force?: boolean } = {}): Promise<boolean> {
-  const current = await getSummary();
-  const stats = await getStats();
-  if (!current || stats.lastN <= current.afterN) return false;
+let cadenceCache: { lastN: number; at: number; every: number } | null = null;
 
+// Cada cuántos párrafos toca reescribir el resumen ahora mismo, según los párrafos de las últimas 24 h.
+// No los cuenta: mira la fecha de unos pocos párrafos por su número (el 50, 100, 200 y 500 antes del último),
+// que es una consulta por clave primaria y cuesta lo mismo con 100 párrafos que con un millón.
+export async function summaryEvery(lastN: number): Promise<number> {
+  if (cadenceCache && cadenceCache.lastN === lastN && Date.now() - cadenceCache.at < 60_000) return cadenceCache.every;
+  const probes = SUMMARY_RATE_STEPS.filter((k) => lastN - k >= 1);
+  let every = summaryBatchSize(0);
+  if (probes.length) {
+    const { data, error } = await db()
+      .from("paragraphs")
+      .select("n, created_at")
+      .in("n", probes.map((k) => lastN - k));
+    if (error) {
+      console.error("[resumen] no se pudo medir el ritmo:", error.message);
+      return cadenceCache?.every ?? every;
+    }
+    const since = Date.now() - DAY_MS;
+    const recent = (data as { n: number; created_at: string }[]).filter((r) => Date.parse(r.created_at) >= since);
+    // Si el párrafo (último − k) es de las últimas 24 h, ese día van al menos k + 1 párrafos.
+    const atLeast = recent.reduce((max, r) => Math.max(max, lastN - Number(r.n) + 1), 0);
+    every = summaryBatchSize(atLeast);
+  }
+  cadenceCache = { lastN, at: Date.now(), every };
+  return every;
+}
+
+// Reescribe el resumen cuando se completa el lote de párrafos nuevos (ver summary-policy.ts).
+// Se puede llamar tantas veces como se quiera: si no toca, no hace nada.
+export async function refreshSummaryIfNeeded(known: { stats?: Stats; summary?: Summary | null } = {}): Promise<boolean> {
+  const [stats, current] = await Promise.all([
+    known.stats ?? getStats(),
+    known.summary !== undefined ? known.summary : getSummary(),
+  ]);
+  if (!current) return false;
   const pending = stats.lastN - current.afterN;
-  const ageMs = Date.now() - new Date(current.updatedAt).getTime();
-  if (!opts.force && ageMs < 20_000 && pending < 5) return false;
+  if (pending <= 0) return false;
+  const every = await summaryEvery(stats.lastN);
+  const sinceLastRewriteMs = Date.now() - new Date(current.updatedAt).getTime();
+  if (!shouldRefreshSummary({ pending, every, sinceLastRewriteMs })) return false;
 
   const { data: claimed, error: claimError } = await db().rpc("claim_summary_refresh");
   if (claimError) throw claimError;
   const claim = (claimed as { sections: SummarySections; after_n: number }[])[0];
   if (!claim) return false; // otro proceso ya lo está haciendo
 
-  try {
-    const fromN = Math.max(Number(claim.after_n), stats.lastN - SUMMARY_MAX_NEW);
-    const fresh = await paragraphsAfter(fromN, SUMMARY_MAX_NEW);
-    if (!fresh.length) return false;
-    const skipped = fromN - Number(claim.after_n);
-    const sections = await rewriteSummary(claim.sections, fresh, skipped);
-    if (!sections) return false;
-    const lastIncluded = fresh[fresh.length - 1].n;
-    const { error } = await db()
-      .from("book_summary")
-      .update({ sections, after_n: lastIncluded, updated_at: new Date().toISOString(), refreshing_since: null })
-      .eq("id", 1);
-    if (error) throw error;
-    return true;
-  } finally {
+  // Si algo falla, la marca de «reescribiendo» se queda puesta y caduca sola a los 3 minutos:
+  // así un fallo de Claude no se reintenta en cada visita.
+  const fromN = Math.max(Number(claim.after_n), stats.lastN - SUMMARY_MAX_NEW);
+  const fresh = await paragraphsAfter(fromN, SUMMARY_MAX_NEW);
+  if (!fresh.length) {
     await db().from("book_summary").update({ refreshing_since: null }).eq("id", 1);
+    return false;
   }
+  const skipped = fromN - Number(claim.after_n);
+  const sections = await rewriteSummary(claim.sections, fresh, skipped);
+  if (!sections) return false;
+  const lastIncluded = fresh[fresh.length - 1].n;
+  const { error } = await db()
+    .from("book_summary")
+    .update({ sections, after_n: lastIncluded, updated_at: new Date().toISOString(), refreshing_since: null })
+    .eq("id", 1);
+  if (error) throw error;
+  return true;
 }

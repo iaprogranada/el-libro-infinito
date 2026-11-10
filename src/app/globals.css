@@ -121,6 +121,7 @@ button{font:inherit; color:inherit; cursor:pointer}
 .summary p{margin:0; font-family:var(--book); font-size:1.02rem; line-height:1.5; color:var(--bone)}
 .summary .latest{border:1px solid var(--line); background:var(--desk-2); border-radius:8px; padding:10px 12px}
 .summary .latest p{font-size:.98rem}
+.cadence{margin:2px 0 6px; font-size:12px; color:var(--gold); letter-spacing:.02em; font-variant-numeric:tabular-nums}
 .updated{font-size:12px; color:var(--bone-dim); font-variant-numeric:tabular-nums}
 .updated .dot{display:inline-block; width:7px; height:7px; border-radius:50%; background:#6fb37a; margin-right:6px; vertical-align:1px; box-shadow:0 0 0 3px rgba(111,179,122,.18)}
 .sum-cta{border-top:1px solid var(--line); padding-top:12px; display:flex; flex-direction:column; gap:10px}

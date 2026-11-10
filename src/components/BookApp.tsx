@@ -13,11 +13,13 @@ export interface InitialData {
   paragraphs: Paragraph[];
   authors: AuthorEntry[];
   summary: Summary | null;
+  summaryEvery: number;
 }
 
 interface LiveResponse {
   stats: Stats;
   summary: Summary | null;
+  summaryEvery?: number;
   paragraphs: Paragraph[];
 }
 
@@ -84,6 +86,7 @@ export default function BookApp({ initial }: { initial: InitialData }) {
   const [items, setItems] = useState(initial.paragraphs);
   const [authors, setAuthors] = useState(initial.authors);
   const [summary, setSummary] = useState(initial.summary);
+  const [summaryEvery, setSummaryEvery] = useState(initial.summaryEvery);
   const [latest, setLatest] = useState<Paragraph | null>(initial.paragraphs.at(-1) ?? null);
   const [older, setOlder] = useState<Load>("idle");
   const [newer, setNewer] = useState<Load>("idle");
@@ -238,6 +241,7 @@ export default function BookApp({ initial }: { initial: InitialData }) {
   const applyLive = useCallback((res: LiveResponse) => {
     setStats((s) => (res.stats.lastN >= s.lastN ? res.stats : s));
     setSummary((cur) => (!cur || (res.summary && res.summary.afterN >= cur.afterN) ? res.summary : cur));
+    if (res.summaryEvery) setSummaryEvery(res.summaryEvery);
     const incoming = res.paragraphs;
     if (!incoming.length) return;
     const el = parchRef.current;
@@ -283,6 +287,7 @@ export default function BookApp({ initial }: { initial: InitialData }) {
       ]);
       setStats((s) => (live.stats.lastN >= s.lastN ? live.stats : s));
       setSummary((cur) => (!cur || (live.summary && live.summary.afterN >= cur.afterN) ? live.summary : cur));
+      if (live.summaryEvery) setSummaryEvery(live.summaryEvery);
       if (authorsRes) {
         authorsToBottom.current = true;
         setAuthors(authorsRes.authors);
@@ -662,6 +667,7 @@ export default function BookApp({ initial }: { initial: InitialData }) {
             </button>
             <div>
               <h2>La historia hasta ahora</h2>
+              <p className="cadence">Se actualiza cada {fmt(summaryEvery)} párrafos</p>
               {summary && (
                 <p className="updated">
                   <span className="dot" />
@@ -694,7 +700,7 @@ export default function BookApp({ initial }: { initial: InitialData }) {
                 <button className="cta" onClick={() => openWrite()}>
                   Escribir el párrafo {fmt(nextN)} · 1 €
                 </button>
-                <p className="ai-note">Este resumen lo escribe una IA leyendo el libro, y se reescribe solo cada vez que alguien publica.</p>
+                <p className="ai-note">Este resumen lo escribe una IA leyendo el libro, y se reescribe solo cada {fmt(summaryEvery)} párrafos nuevos.</p>
               </div>
             </div>
           </aside>

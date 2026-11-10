@@ -15,6 +15,9 @@ export async function createStripeCheckout(submissionId: string, lines: QuoteLin
   const session = await stripe().checkout.sessions.create(
     {
       mode: "payment",
+      // Solo tarjeta. Apple Pay y Google Pay van incluidos en "card" y salen en los dispositivos compatibles.
+      // Se fija aquí para no cambiar los métodos de pago del resto de la cuenta de Stripe.
+      allowed_payment_method_types: ["card"],
       locale: "es",
       client_reference_id: submissionId,
       metadata: { submission_id: submissionId },

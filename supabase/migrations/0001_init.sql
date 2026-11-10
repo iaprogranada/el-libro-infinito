@@ -63,7 +63,11 @@ create table public.rate_hits (
 );
 create index rate_hits_key_at_idx on public.rate_hits (key, at);
 
--- Nadie entra a las tablas con la clave pública: sin políticas, RLS lo bloquea todo.
+-- Solo el servidor (service_role) usa las tablas. Con la clave pública no se ve nada:
+-- no hay políticas, así que RLS lo bloquea todo aunque el proyecto exponga las tablas.
+grant usage on schema public to service_role;
+grant select, insert, update, delete on all tables in schema public to service_role;
+
 alter table public.paragraphs   enable row level security;
 alter table public.invites      enable row level security;
 alter table public.submissions  enable row level security;

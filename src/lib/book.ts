@@ -131,7 +131,7 @@ export async function cancelSubmission(id: string): Promise<void> {
 
 // true si esta IP aún puede hacer esta acción (cada acción lleva su propio contador).
 export async function rateAllowed(bucket: string, ip: string, max: number, windowSeconds: number): Promise<boolean> {
-  const salt = process.env.RATE_LIMIT_SALT || "libro";
+  const salt = process.env.RATE_LIMIT_SALT || process.env.SUPABASE_SERVICE_ROLE_KEY || "libro";
   const key = createHash("sha256").update(salt + ":" + bucket + ":" + ip).digest("hex").slice(0, 32);
   const { data, error } = await db().rpc("rate_check", { p_key: key, p_max: max, p_window_seconds: windowSeconds });
   if (error) {

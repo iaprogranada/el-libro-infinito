@@ -42,7 +42,7 @@ Importa el repositorio y añade estas variables de entorno (ver `.env.example`):
 | `STRIPE_WEBHOOK_SECRET` | Secreto del webhook de Stripe (`whsec_…`) |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Credenciales REST de PayPal (opcional; sin ellas no sale el botón) |
 | `PAYPAL_ENV` | `live` en producción, `sandbox` para probar |
-| `RATE_LIMIT_SALT` | Cualquier texto largo y aleatorio |
+| `RATE_LIMIT_SALT` | Opcional: texto aleatorio para anonimizar IPs (si falta, se usa la clave de Supabase) |
 
 ### 3. Stripe
 

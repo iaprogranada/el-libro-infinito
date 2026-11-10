@@ -6,15 +6,15 @@ export const SITE = {
   agencyUrl: "https://www.iapro.top",
   agencyLabel: "www.iapro.top",
   // Fecha de lanzamiento (AAAA-MM-DD). Mientras sea null no se muestra en el pie.
-  launchDate: null as string | null,
+  launchDate: "2026-11-10" as string | null,
 };
 
 // Datos del titular para el aviso legal y la privacidad. Rellenar antes de lanzar.
 export const LEGAL = {
-  titular: "",
-  nif: "",
-  domicilio: "",
-  email: "",
+  titular: "Jesús Martín Lupión",
+  nif: "74655765L",
+  domicilio: "C/ Emperatriz Eugenia, 18002 Granada (España)",
+  email: "info@iapro.top",
 };
 
 export function longDate(iso: string): string {

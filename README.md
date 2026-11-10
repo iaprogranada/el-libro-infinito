@@ -26,7 +26,9 @@ En **SQL Editor**, ejecuta en este orden:
 2. `supabase/seed.sql` (párrafo de Chusi, los 17 de arranque y el primer resumen).
 3. El archivo de invitaciones `invitaciones-lote-1.sql` (no está en el repositorio a propósito: los códigos son privados).
 
-Copia de **Project Settings → API** la URL del proyecto y la clave `service_role`.
+Al crear el proyecto, desmarca "Automatically expose new tables": la migración ya da los permisos justos al servidor.
+
+Copia la URL del proyecto (`https://<ref>.supabase.co`) y, de **Project Settings → API Keys**, la clave secreta (`sb_secret_…`; también vale la antigua `service_role`).
 
 ### 2. Vercel
 
@@ -36,9 +38,9 @@ Importa el repositorio y añade estas variables de entorno (ver `.env.example`):
 | --- | --- |
 | `NEXT_PUBLIC_SITE_URL` | `https://ellibroinfinito.com` |
 | `SUPABASE_URL` | URL del proyecto de Supabase |
-| `SUPABASE_SERVICE_ROLE_KEY` | Clave `service_role` de Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Clave secreta de Supabase (`sb_secret_…` o la antigua `service_role`) |
 | `ANTHROPIC_API_KEY` | Clave de la API de Claude |
-| `STRIPE_SECRET_KEY` | Clave secreta de Stripe (`sk_live_…`, o `sk_test_…` para probar) |
+| `STRIPE_SECRET_KEY` | Clave restringida de Stripe (`rk_live_…`) con un solo permiso: **Checkout Sessions → Escritura**. También vale una `sk_…` |
 | `STRIPE_WEBHOOK_SECRET` | Secreto del webhook de Stripe (`whsec_…`) |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Credenciales REST de PayPal (opcional; sin ellas no sale el botón) |
 | `PAYPAL_ENV` | `live` en producción, `sandbox` para probar |
@@ -57,7 +59,7 @@ Copia su secreto en `STRIPE_WEBHOOK_SECRET`.
 
 ### 4. Dominio
 
-En Vercel, añade `ellibroinfinito.com` y `www.ellibroinfinito.com` al proyecto y copia los registros DNS que indique en Hostinger (zona DNS del dominio).
+En Vercel, añade `ellibroinfinito.com` conectado a Production (sin redirigir a www, para que el webhook de Stripe no reciba redirecciones) y `www.ellibroinfinito.com` como redirección 308 a `ellibroinfinito.com`. Copia en Hostinger (zona DNS del dominio) los registros que indique Vercel: un `A @` y un `CNAME www`, sustituyendo los de aparcamiento.
 
 ## Cosas que se cambian a mano
 

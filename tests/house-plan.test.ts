@@ -79,5 +79,18 @@ test("los encargos varían y respetan los límites", () => {
   }
   assert.ok(new Set(briefs.map((b) => b.length)).size === 3);
   const golds = briefs.filter((b) => b.gold).length;
-  assert.ok(golds > 5 && golds < 60);
+  const signed = briefs.filter((b) => b.signed).length;
+  assert.ok(golds >= 3 && golds <= 35, `dorados ${golds}`);
+  assert.ok(signed > 90 && signed < 190, `firmados ${signed}`);
+});
+
+test("el tipo de nombre se sortea: apodos, nombres, descripciones, iniciales…", () => {
+  const rand = seededRandom("nombres");
+  const kinds = Array.from({ length: 1000 }, () => pickBrief(rand).nameStyle.kind);
+  const count = (k: string) => kinds.filter((x) => x === k).length;
+  for (const k of ["apodo", "nombre", "nombre_completo", "descripcion", "iniciales", "nombre_y_lugar", "usuario_de_internet", "anonimo"]) {
+    assert.ok(count(k) > 15, `${k}: ${count(k)}`);
+  }
+  // El nombre real completo es minoría.
+  assert.ok(count("nombre_completo") < 150);
 });

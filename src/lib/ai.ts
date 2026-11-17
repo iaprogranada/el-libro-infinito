@@ -170,14 +170,14 @@ Normas del libro, sin excepciones: nada de palabrotas, insultos, violencia real,
 
 El nombre de usuario:
 - Si el encargo trae "autor", usa exactamente ese.
-- Si no, invéntalo: verosímil y variado (un apodo con números, nombre_ciudad, nombre y apellido corriente, un mote gracioso…), de 2 a 24 caracteres, solo letras, números, espacios y los signos _ . - '. Que no esté en la lista de autores que ya existen ni se parezca a ninguno, y que no sea el de un famoso, una marca o "admin".`;
+- Si no, invéntalo siguiendo el "estilo_del_nombre" del encargo: mucha gente no pone su nombre real. Que sea verosímil, de 2 a 24 caracteres, solo letras, números, espacios y los signos _ . - '. Que no sea el de un famoso, una marca o "admin". Salvo que el estilo sea de iniciales o anónimo, que no esté en la lista de autores que ya existen ni se parezca a ninguno; no copies los ejemplos del estilo.`;
 
 export interface HouseRequest {
   premise: string;
   summary: SummarySections | null;
   recent: { n: number; username: string; body: string }[];
   existingAuthors: string[];
-  brief: { length: string; minChars: number; maxChars: number; tone: string; register: string; author?: string };
+  brief: { length: string; minChars: number; maxChars: number; tone: string; register: string; nameStyle: string; author?: string };
 }
 
 export async function writeHouseParagraph(req: HouseRequest): Promise<{ username: string; body: string } | null> {
@@ -190,7 +190,7 @@ export async function writeHouseParagraph(req: HouseRequest): Promise<{ username
       longitud: `${req.brief.length}: entre ${req.brief.minChars} y ${req.brief.maxChars} caracteres`,
       tono: req.brief.tone,
       registro: req.brief.register,
-      ...(req.brief.author ? { autor: req.brief.author } : {}),
+      ...(req.brief.author ? { autor: req.brief.author } : { estilo_del_nombre: req.brief.nameStyle }),
     },
   };
   try {

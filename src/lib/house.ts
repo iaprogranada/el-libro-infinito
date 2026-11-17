@@ -71,7 +71,7 @@ async function draft(): Promise<{ username: string; body: string; signed: boolea
     summary: summary?.sections ?? null,
     recent,
     existingAuthors: existing.slice(-400),
-    brief: { ...brief, author },
+    brief: { ...brief, nameStyle: brief.nameStyle.description, author },
   });
   if (!out) return null;
 
@@ -82,7 +82,7 @@ async function draft(): Promise<{ username: string; body: string; signed: boolea
     console.error("[casa] el texto no cumple el formato:", formError);
     return null;
   }
-  if (!author && existing.some((u) => u.toLocaleLowerCase("es-ES") === username.toLocaleLowerCase("es-ES"))) {
+  if (!author && !brief.nameStyle.repeatable && existing.some((u) => u.toLocaleLowerCase("es-ES") === username.toLocaleLowerCase("es-ES"))) {
     console.error("[casa] nombre repetido, se descarta:", username);
     return null;
   }

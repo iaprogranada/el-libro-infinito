@@ -36,8 +36,15 @@ export function houseCountFor(r: number): number {
   return HOUSE_COUNT_WEIGHTS.length - 1;
 }
 
+// Días con plan fijado a mano (minutos del día, hora de Madrid). Sustituyen al sorteo de ese día.
+export const HOUSE_FIXED_DAYS: Record<string, number[]> = {
+  "2026-11-17": [19 * 60 + 45, 20 * 60 + 55], // Chusi pidió 2 hoy (el sorteo había dado 0)
+};
+
 // Minutos del día (hora de Madrid) en los que toca publicar, ordenados. dayKey = "AAAA-MM-DD".
 export function housePlan(dayKey: string, salt = ""): number[] {
+  const fixed = HOUSE_FIXED_DAYS[dayKey];
+  if (fixed) return [...fixed].sort((x, y) => x - y);
   const rand = seededRandom(`casa:${salt}:${dayKey}`);
   const count = houseCountFor(rand());
   const span = HOUSE_DAY_END_MIN - HOUSE_DAY_START_MIN;
@@ -55,7 +62,7 @@ export function dueSlots(plan: number[], minutesNow: number): number {
 }
 
 // Fecha y hora de Madrid para un instante dado, y el instante en que empezó ese día.
-export function madridClock(now: Date): { dayKey: string; minutes: number; dayStart: Date } {
+export function madridClock(now: Date): { dayKey: string; minutes: number; dayStart: Date; dayOfMonth: number; monthStart: Date } {
   const parts = Object.fromEntries(
     new Intl.DateTimeFormat("en-CA", {
       timeZone: "Europe/Madrid",
@@ -72,7 +79,16 @@ export function madridClock(now: Date): { dayKey: string; minutes: number; daySt
   );
   const minutes = Number(parts.hour) * 60 + Number(parts.minute);
   const elapsedMs = (minutes * 60 + Number(parts.second)) * 1000 + now.getMilliseconds();
-  return { dayKey: `${parts.year}-${parts.month}-${parts.day}`, minutes, dayStart: new Date(now.getTime() - elapsedMs) };
+  const dayStart = new Date(now.getTime() - elapsedMs);
+  const dayOfMonth = Number(parts.day);
+  return {
+    dayKey: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes,
+    dayStart,
+    dayOfMonth,
+    // Aproximado en los cambios de hora (una hora arriba o abajo), suficiente para contar dorados del mes.
+    monthStart: new Date(dayStart.getTime() - (dayOfMonth - 1) * 86_400_000),
+  };
 }
 
 /* Cómo será cada párrafo: se sortea en cada publicación. */
@@ -128,9 +144,17 @@ export function pickNameStyle(r: number): NameStyle {
   return { kind: last.kind, description: last.description, repeatable: last.repeatable };
 }
 
-// Extras de pago, como en la vida real: la firma de vez en cuando; el dorado, muy pocas veces.
+// Extras de pago: la firma de vez en cuando; el dorado, poco pero que se vea (Chusi: al menos 2 al mes).
 export const SIGNED_CHANCE = 0.25;
-export const GOLD_CHANCE = 0.03;
+export const GOLD_CHANCE = 0.04; // además del mínimo, alguno más al azar
+export const GOLD_MIN_PER_MONTH = 2;
+export const GOLD_DEADLINE_DAY = 25; // el mínimo del mes se cumple antes de este día
+
+// Cuántos dorados debería llevar ya el mes: va subiendo con los días (el 1.º hacia el día 13, el 2.º hacia el 25).
+// Si van por detrás, el siguiente párrafo de la casa sale dorado. Cuentan también los dorados de pago.
+export function goldTargetByNow(dayOfMonth: number): number {
+  return Math.min(GOLD_MIN_PER_MONTH, Math.floor((GOLD_MIN_PER_MONTH * dayOfMonth) / GOLD_DEADLINE_DAY));
+}
 
 export function pickBrief(rand: () => number = Math.random): HouseBrief {
   const r = rand();

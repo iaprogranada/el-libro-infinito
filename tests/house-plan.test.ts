@@ -5,6 +5,7 @@ import {
   HOUSE_DAY_START_MIN,
   HOUSE_MIN_GAP_MIN,
   dueSlots,
+  goldTargetByNow,
   houseCountFor,
   housePlan,
   madridClock,
@@ -93,4 +94,23 @@ test("el tipo de nombre se sortea: apodos, nombres, descripciones, iniciales…"
   }
   // El nombre real completo es minoría.
   assert.ok(count("nombre_completo") < 150);
+});
+
+test("al menos 2 dorados al mes: el 1.º hacia el día 13 y el 2.º hacia el 25", () => {
+  assert.equal(goldTargetByNow(1), 0);
+  assert.equal(goldTargetByNow(12), 0);
+  assert.equal(goldTargetByNow(13), 1);
+  assert.equal(goldTargetByNow(24), 1);
+  assert.equal(goldTargetByNow(25), 2);
+  assert.equal(goldTargetByNow(31), 2);
+});
+
+test("un día con plan fijado a mano usa ese plan", () => {
+  assert.deepEqual(housePlan("2026-11-17", "x"), [19 * 60 + 45, 20 * 60 + 55]);
+});
+
+test("inicio de mes en hora de Madrid", () => {
+  const c = madridClock(new Date("2026-11-17T18:40:00Z"));
+  assert.equal(c.dayOfMonth, 17);
+  assert.equal(c.monthStart.toISOString(), "2026-10-31T23:00:00.000Z");
 });

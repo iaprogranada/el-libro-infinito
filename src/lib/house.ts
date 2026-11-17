@@ -1,7 +1,7 @@
 import "server-only";
 import { moderate, writeHouseParagraph } from "./ai";
 import { authorsBefore, getStats, getSummary, paragraphsBefore, paragraphsRange, publishSubmission, refreshSummaryIfNeeded } from "./book";
-import { HOUSE_MIN_GAP_MIN, dueSlots, housePlan, madridClock, pickBrief } from "./house-plan";
+import { HOUSE_MIN_GAP_MIN, dueSlots, goldTargetByNow, housePlan, madridClock, pickBrief } from "./house-plan";
 import { db } from "./supabase";
 import { checkForm, normalizeText, normalizeUsername, quickReject } from "./validation";
 
@@ -47,6 +47,17 @@ async function fictionalAuthors(): Promise<string[]> {
   return [...new Set(names)];
 }
 
+// Dorados publicados este mes (de la casa y de pago).
+async function goldsThisMonth(monthStart: Date): Promise<number> {
+  const { count, error } = await db()
+    .from("paragraphs")
+    .select("n", { count: "exact", head: true })
+    .eq("gold", true)
+    .gte("created_at", monthStart.toISOString());
+  if (error) throw error;
+  return count ?? 0;
+}
+
 // Escribe un párrafo con Claude, lo pasa por el filtro y devuelve el texto listo (sin publicarlo).
 async function draft(): Promise<{ username: string; body: string; signed: boolean; gold: boolean } | null> {
   const stats = await getStats();
@@ -59,6 +70,11 @@ async function draft(): Promise<{ username: string; body: string; signed: boolea
   ]);
   const existing = [...new Set(authors.map((a) => a.username))];
   const brief = pickBrief();
+  const clock = madridClock(new Date());
+  if (!brief.gold && (await goldsThisMonth(clock.monthStart)) < goldTargetByNow(clock.dayOfMonth)) {
+    brief.gold = true;
+    brief.signed = true;
+  }
   const lastAuthors = new Set(recent.slice(-8).map((p) => p.username.toLocaleLowerCase("es-ES")));
   const returning = fictional.filter((u) => !lastAuthors.has(u.toLocaleLowerCase("es-ES")));
   const author =

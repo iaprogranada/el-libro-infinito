@@ -1,9 +1,14 @@
 import { after, type NextRequest } from "next/server";
 import { getStats, getSummary, paragraphsAfter, refreshSummaryIfNeeded, summaryEvery } from "@/lib/book";
+import { runHouseWriter } from "@/lib/house";
 import { shouldRefreshSummary } from "@/lib/summary-policy";
 import { cached, fail, int } from "@/lib/http";
 
 export const runtime = "nodejs";
+export const maxDuration = 120;
+
+// Las visitas también despiertan al escritor de la casa, como mucho una vez por minuto en cada servidor.
+let lastHouseCheck = 0;
 
 // Lo que la página consulta cada pocos segundos: párrafos nuevos, contadores y resumen.
 export async function GET(req: NextRequest) {
@@ -21,6 +26,10 @@ export async function GET(req: NextRequest) {
       })
     ) {
       after(() => refreshSummaryIfNeeded({ stats, summary }).catch((e) => console.error("[resumen]", e)));
+    }
+    if (Date.now() - lastHouseCheck > 60_000) {
+      lastHouseCheck = Date.now();
+      after(() => runHouseWriter().catch((e) => console.error("[casa]", e)));
     }
     return cached({ stats, summary, summaryEvery: every, paragraphs: fresh }, 3);
   } catch (e) {

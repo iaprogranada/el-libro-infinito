@@ -1,0 +1,15 @@
+name: Párrafos de la casa
+
+# Despierta al escritor de la casa cada dos horas (de 9:17 a 23:17 en horario de invierno de Madrid).
+# La web decide sola si toca publicar según el plan del día; si no toca, no hace nada.
+on:
+  schedule:
+    - cron: "17 8-22/2 * * *"
+  workflow_dispatch:
+
+jobs:
+  despertar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - run: curl -fsS --max-time 150 https://ellibroinfinito.com/api/house

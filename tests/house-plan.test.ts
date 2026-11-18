@@ -7,6 +7,7 @@ import {
   dueSlots,
   goldTargetByNow,
   houseCountFor,
+  lengthFits,
   housePlan,
   madridClock,
   pickBrief,
@@ -71,18 +72,36 @@ test("hora de Madrid en invierno y en verano", () => {
   assert.equal(summer.minutes, 30);
 });
 
-test("los encargos varían y respetan los límites", () => {
+test("los encargos se parecen al arranque: muchas frases cortas, pocas largas y poca firma", () => {
   const rand = seededRandom("prueba");
-  const briefs = Array.from({ length: 500 }, () => pickBrief(rand));
+  const briefs = Array.from({ length: 2000 }, () => pickBrief(rand));
   for (const b of briefs) {
-    assert.ok(b.maxChars <= 490 && b.minChars < b.maxChars);
+    assert.ok(b.maxChars <= 480 && b.minChars < b.maxChars);
+    assert.ok(b.targetChars >= b.minChars && b.targetChars <= b.maxChars);
     if (b.gold) assert.ok(b.signed);
   }
-  assert.ok(new Set(briefs.map((b) => b.length)).size === 3);
-  const golds = briefs.filter((b) => b.gold).length;
-  const signed = briefs.filter((b) => b.signed).length;
-  assert.ok(golds >= 3 && golds <= 35, `dorados ${golds}`);
-  assert.ok(signed > 90 && signed < 190, `firmados ${signed}`);
+  const share = (f: (b: (typeof briefs)[number]) => boolean) => briefs.filter(f).length / briefs.length;
+  const short = share((b) => b.targetChars <= 120);
+  const long = share((b) => b.targetChars > 300);
+  assert.ok(short > 0.35 && short < 0.6, `cortos ${short}`);
+  assert.ok(long > 0.12 && long < 0.35, `largos ${long}`);
+  const signed = share((b) => b.signed);
+  assert.ok(signed > 0.17 && signed < 0.3, `firmados ${signed}`);
+  assert.ok(new Set(briefs.map((b) => b.voice)).size >= 8);
+});
+
+test("después de un párrafo firmado, la firma casi nunca se repite", () => {
+  const rand = seededRandom("firmas");
+  const after = Array.from({ length: 2000 }, () => pickBrief(rand, { prevSigned: true }));
+  const signed = after.filter((b) => b.signed && !b.gold).length / after.length;
+  assert.ok(signed < 0.1, `firmados tras firmado ${signed}`);
+});
+
+test("el largo escrito tiene que parecerse al pedido", () => {
+  const brief = { minChars: 20, maxChars: 90 };
+  assert.equal(lengthFits("Las croquetas, por cierto, también desaparecieron.", brief), true);
+  assert.equal(lengthFits("x".repeat(300), brief), false);
+  assert.equal(lengthFits("Ya", { minChars: 200, maxChars: 480 }), false);
 });
 
 test("el tipo de nombre se sortea: apodos, nombres, descripciones, iniciales…", () => {

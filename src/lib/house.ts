@@ -1,7 +1,7 @@
 import "server-only";
 import { moderate, writeHouseParagraph } from "./ai";
 import { authorsBefore, getStats, getSummary, paragraphsBefore, paragraphsRange, publishSubmission, refreshSummaryIfNeeded } from "./book";
-import { HOUSE_MIN_GAP_MIN, dueSlots, goldTargetByNow, housePlan, madridClock, pickBrief } from "./house-plan";
+import { HOUSE_MIN_GAP_MIN, dueSlots, goldTargetByNow, housePlan, lengthFits, madridClock, pickBrief } from "./house-plan";
 import { db } from "./supabase";
 import { checkForm, normalizeText, normalizeUsername, quickReject } from "./validation";
 
@@ -69,7 +69,7 @@ async function draft(): Promise<{ username: string; body: string; signed: boolea
     fictionalAuthors(),
   ]);
   const existing = [...new Set(authors.map((a) => a.username))];
-  const brief = pickBrief();
+  const brief = pickBrief(Math.random, { prevSigned: recent.at(-1)?.signed ?? false });
   const clock = madridClock(new Date());
   if (!brief.gold && (await goldsThisMonth(clock.monthStart)) < goldTargetByNow(clock.dayOfMonth)) {
     brief.gold = true;
@@ -87,7 +87,15 @@ async function draft(): Promise<{ username: string; body: string; signed: boolea
     summary: summary?.sections ?? null,
     recent,
     existingAuthors: existing.slice(-400),
-    brief: { ...brief, nameStyle: brief.nameStyle.description, author },
+    brief: {
+      form: brief.form,
+      targetChars: brief.targetChars,
+      minChars: brief.minChars,
+      maxChars: brief.maxChars,
+      voice: brief.voice,
+      nameStyle: brief.nameStyle.description,
+      author,
+    },
   });
   if (!out) return null;
 
@@ -100,6 +108,10 @@ async function draft(): Promise<{ username: string; body: string; signed: boolea
   }
   if (!author && !brief.nameStyle.repeatable && existing.some((u) => u.toLocaleLowerCase("es-ES") === username.toLocaleLowerCase("es-ES"))) {
     console.error("[casa] nombre repetido, se descarta:", username);
+    return null;
+  }
+  if (!lengthFits(body, brief)) {
+    console.error(`[casa] largo fuera de lo pedido (${body.length}, pedido ${brief.minChars}-${brief.maxChars}), se descarta`);
     return null;
   }
   if (quickReject(username, body)) return null;

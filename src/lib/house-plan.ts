@@ -94,24 +94,41 @@ export function madridClock(now: Date): { dayKey: string; minutes: number; daySt
 /* Cómo será cada párrafo: se sortea en cada publicación. */
 
 export interface HouseBrief {
-  length: "corto" | "medio" | "largo";
-  maxChars: number;
+  form: string;
+  targetChars: number;
   minChars: number;
-  tone: string;
-  register: "cuidado" | "informal";
+  maxChars: number;
+  voice: string;
   nameStyle: NameStyle;
   signed: boolean;
   gold: boolean;
 }
 
-export const HOUSE_TONES = [
-  "gracioso, con una ocurrencia o una exageración",
-  "de intriga: añade una pista pequeña o un detalle inquietante, sin resolver nada",
-  "emotivo: un recuerdo familiar o de alguien que conoció a Paco",
-  "teoría de lector: alguien que opina qué pudo pasar",
-  "reacción a lo último que se ha escrito, siguiéndolo o llevándole un poco la contraria",
-  "costumbrista: un detalle de época, del barrio o de la familia",
-  "un giro pequeño que abra una puerta nueva sin romper la historia",
+// Qué tipo de aportación es. Calibrado con los párrafos del arranque (2-18): un tercio son frases de una
+// línea, otro tercio párrafos cortos y el resto largos; hay chistes, preguntas, teorías, narración y testimonios.
+export const HOUSE_FORMS: readonly { weight: number; form: string; min: number; max: number }[] = [
+  { weight: 18, min: 20, max: 90, form: "una salida graciosa o un chiste de una línea sobre lo último que ha pasado" },
+  { weight: 12, min: 30, max: 140, form: "una pregunta o una duda lanzada al resto de lectores" },
+  { weight: 15, min: 40, max: 180, form: "un comentario breve que sigue o lleva la contraria al párrafo anterior" },
+  { weight: 8, min: 20, max: 120, form: "una ocurrencia absurda que lleva la historia por un camino raro sin romperla" },
+  { weight: 6, min: 50, max: 170, form: "alguien que lo lee desde otro país o ciudad, saluda y deja una idea (a veces en inglés, portugués o italiano sencillo)" },
+  { weight: 11, min: 120, max: 360, form: "una teoría propia sobre qué pudo pasar" },
+  { weight: 15, min: 200, max: 480, form: "narración en tercera persona que hace avanzar la historia, como un capítulo del libro" },
+  { weight: 11, min: 180, max: 470, form: "un testimonio: algo que recuerda o que le contaron de la familia, del pueblo o de la época" },
+  { weight: 4, min: 250, max: 480, form: "alguien que pone orden y resume las pistas, y añade una idea nueva" },
+];
+
+// La voz de quien escribe: que no parezca siempre la misma persona.
+export const HOUSE_VOICES = [
+  "escribe en minúsculas y casi sin puntos, como en un chat",
+  "frases muy cortas y secas",
+  "correcto y algo formal, como una persona mayor",
+  "entusiasta, con alguna exclamación",
+  "irónico y con retranca",
+  "escribe como habla, con muletillas (pues, vamos, o sea, bueno)",
+  "cuidadoso y literario, como quien quiere quedar bien en el libro",
+  "despistado, se va un poco por las ramas",
+  "sencillo y directo, sin adornos",
 ] as const;
 
 // No todo el mundo pone su nombre real: el tipo de nombre también se sortea.
@@ -145,7 +162,8 @@ export function pickNameStyle(r: number): NameStyle {
 }
 
 // Extras de pago: la firma de vez en cuando; el dorado, poco pero que se vea (Chusi: al menos 2 al mes).
-export const SIGNED_CHANCE = 0.25;
+export const SIGNED_CHANCE = 0.2;
+export const SIGNED_AFTER_SIGNED_CHANCE = 0.07; // dos firmados seguidos cantan
 export const GOLD_CHANCE = 0.04; // además del mínimo, alguno más al azar
 export const GOLD_MIN_PER_MONTH = 2;
 export const GOLD_DEADLINE_DAY = 25; // el mínimo del mes se cumple antes de este día
@@ -156,19 +174,34 @@ export function goldTargetByNow(dayOfMonth: number): number {
   return Math.min(GOLD_MIN_PER_MONTH, Math.floor((GOLD_MIN_PER_MONTH * dayOfMonth) / GOLD_DEADLINE_DAY));
 }
 
-export function pickBrief(rand: () => number = Math.random): HouseBrief {
-  const r = rand();
-  const length = r < 0.35 ? "corto" : r < 0.75 ? "medio" : "largo";
-  const [minChars, maxChars] = length === "corto" ? [30, 140] : length === "medio" ? [150, 320] : [330, 490];
+function weighted<T extends { weight: number }>(items: readonly T[], r: number): T {
+  const total = items.reduce((acc, x) => acc + x.weight, 0);
+  let acc = 0;
+  for (const x of items) {
+    acc += x.weight / total;
+    if (r < acc) return x;
+  }
+  return items[items.length - 1];
+}
+
+export function pickBrief(rand: () => number = Math.random, ctx: { prevSigned?: boolean } = {}): HouseBrief {
+  const f = weighted(HOUSE_FORMS, rand());
+  const targetChars = Math.round(f.min + rand() * (f.max - f.min));
   const gold = rand() < GOLD_CHANCE;
+  const signChance = ctx.prevSigned ? SIGNED_AFTER_SIGNED_CHANCE : SIGNED_CHANCE;
   return {
-    length,
-    minChars,
-    maxChars,
-    tone: HOUSE_TONES[Math.floor(rand() * HOUSE_TONES.length)],
-    register: rand() < 0.4 ? "informal" : "cuidado",
+    form: f.form,
+    targetChars,
+    minChars: f.min,
+    maxChars: f.max,
+    voice: HOUSE_VOICES[Math.floor(rand() * HOUSE_VOICES.length)],
     nameStyle: pickNameStyle(rand()),
-    signed: gold || rand() < SIGNED_CHANCE,
+    signed: gold || rand() < signChance,
     gold,
   };
+}
+
+// ¿El texto escrito respeta el largo pedido? Se deja algo de margen.
+export function lengthFits(text: string, brief: Pick<HouseBrief, "minChars" | "maxChars">): boolean {
+  return text.length >= Math.floor(brief.minChars * 0.5) && text.length <= Math.min(500, Math.ceil(brief.maxChars * 1.2));
 }

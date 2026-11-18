@@ -116,6 +116,25 @@ export type HouseResult = { status: "off" | "nothing_due" | "waiting" | "busy" |
 // Publica un párrafo de la casa si el plan de hoy lo pide. Se puede llamar todas las veces que se quiera:
 // como mucho publica uno por llamada, deja al menos 40 minutos entre dos y nunca pasa del plan del día.
 export async function runHouseWriter(now = new Date()): Promise<HouseResult> {
+  return houseStep(now, { ignoreGap: false, refreshSummary: true });
+}
+
+// Repaso de la noche (cron diario de Vercel): publica lo que quede pendiente del plan de hoy,
+// por si en todo el día no ha habido visitas ni ha saltado la tarea de GitHub.
+export async function catchUpHouseWriter(): Promise<HouseResult[]> {
+  const results: HouseResult[] = [];
+  for (let i = 0; i < 3; i++) {
+    const r = await houseStep(new Date(), { ignoreGap: true, refreshSummary: false });
+    results.push(r);
+    if (r.status !== "published") break;
+  }
+  if (results.some((r) => r.status === "published")) {
+    await refreshSummaryIfNeeded().catch((e) => console.error("[resumen]", e));
+  }
+  return results;
+}
+
+async function houseStep(now: Date, opts: { ignoreGap: boolean; refreshSummary: boolean }): Promise<HouseResult> {
   if (!HOUSE_ENABLED) return { status: "off" };
   const clock = madridClock(now);
   const due = dueSlots(housePlan(clock.dayKey, salt()), clock.minutes);
@@ -123,7 +142,7 @@ export async function runHouseWriter(now = new Date()): Promise<HouseResult> {
 
   const today = await houseToday(clock.dayStart);
   if (today.done >= due) return { status: "nothing_due" };
-  if (today.lastAt && now.getTime() - today.lastAt < HOUSE_MIN_GAP_MIN * 60_000) return { status: "waiting" };
+  if (!opts.ignoreGap && today.lastAt && now.getTime() - today.lastAt < HOUSE_MIN_GAP_MIN * 60_000) return { status: "waiting" };
 
   // Un solo servidor escribe cada turno; si falla, se reintenta en la siguiente franja de 10 minutos.
   const bucket = Math.floor(now.getTime() / 600_000);
@@ -146,7 +165,7 @@ export async function runHouseWriter(now = new Date()): Promise<HouseResult> {
     return { status: "failed" };
   }
   const n = await publishSubmission(sub.id);
-  await refreshSummaryIfNeeded().catch((e) => console.error("[resumen]", e));
+  if (opts.refreshSummary) await refreshSummaryIfNeeded().catch((e) => console.error("[resumen]", e));
   return { status: "published", n };
 }
 

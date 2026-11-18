@@ -1,6 +1,7 @@
 name: Párrafos de la casa
 
-# Despierta al escritor de la casa cada dos horas (de 9:17 a 23:17 en horario de invierno de Madrid).
+# Despierta al escritor de la casa cada dos horas (GitHub a veces los retrasa o se los salta;
+# el repaso fiable es el cron diario de Vercel en vercel.json).
 # La web decide sola si toca publicar según el plan del día; si no toca, no hace nada.
 on:
   schedule:

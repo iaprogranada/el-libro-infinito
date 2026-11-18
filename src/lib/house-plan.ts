@@ -2,12 +2,12 @@
 // para que el libro tenga movimiento y no pierda el hilo hasta que lo llenen los lectores.
 //
 // Cada día se tira un dado, sin patrón por día de la semana: unos días ninguno, otros 1, 2 o 3,
-// a horas al azar entre las 9:00 y las 23:45 (hora de Madrid). De media salen unos 10 a la semana.
+// a horas al azar entre las 9:00 y las 22:00 (hora de Madrid). De media salen unos 10 a la semana.
 // El dado es determinista por fecha: cualquier servidor que lo consulte ve el mismo plan del día.
 
 export const HOUSE_COUNT_WEIGHTS = [0.2, 0.35, 0.3, 0.15] as const; // probabilidad de 0, 1, 2 y 3 párrafos
 export const HOUSE_DAY_START_MIN = 9 * 60;
-export const HOUSE_DAY_END_MIN = 23 * 60 + 45;
+export const HOUSE_DAY_END_MIN = 22 * 60; // antes del repaso diario de Vercel (22:00-23:00 en invierno)
 export const HOUSE_MIN_GAP_MIN = 40; // minutos mínimos entre dos párrafos de la casa
 
 // Generador pseudoaleatorio con semilla (FNV-1a + mulberry32): mismo texto, misma secuencia.
